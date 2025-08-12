@@ -1,0 +1,80 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  build-and-deploy:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push analytics-service
+        uses: docker/build-push-action@v5
+        with:
+          context: services/analytics-service
+          push: true
+          tags: ghcr.io/${{ github.repository }}/analytics-service:latest
+      - name: Build and push game-service
+        uses: docker/build-push-action@v5
+        with:
+          context: services/game-service
+          push: true
+          tags: ghcr.io/${{ github.repository }}/game-service:latest
+      - name: Build and push order-service
+        uses: docker/build-push-action@v5
+        with:
+          context: services/order-service
+          push: true
+          tags: ghcr.io/${{ github.repository }}/order-service:latest
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: frontend
+          push: true
+          tags: ghcr.io/${{ github.repository }}/frontend:latest
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: v1.29.0
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+      - name: Deploy to cluster
+        run: kubectl apply -f k8s
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/analytics-service
+          kubectl rollout status deployment/game-service
+          kubectl rollout status deployment/order-service
+          kubectl rollout status deployment/frontend
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run integration tests
+        run: ./scripts/integration-test.sh http://app.localtest.me
+
+  scheduled-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run scheduled integration tests
+        run: ./scripts/integration-test.sh http://app.localtest.me
