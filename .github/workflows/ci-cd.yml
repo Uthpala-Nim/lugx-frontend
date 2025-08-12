@@ -26,19 +26,19 @@ jobs:
         with:
           context: services/analytics-service
           push: true
-          tags: ghcr.io/${{ github.repository }}/analytics-service:latest
+          tags: ghcr.io/${{ github.repository.lower() }}/analytics-service:latest
       - name: Build and push game-service
         uses: docker/build-push-action@v5
         with:
           context: services/game-service
           push: true
-          tags: ghcr.io/${{ github.repository }}/game-service:latest
+          tags: ghcr.io/${{ github.repository.lower() }}/game-service:latest
       - name: Build and push order-service
         uses: docker/build-push-action@v5
         with:
           context: services/order-service
           push: true
-          tags: ghcr.io/${{ github.repository }}/order-service:latest
+          tags: ghcr.io/${{ github.repository.lower() }}/order-service:latest
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
